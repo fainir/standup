@@ -1,0 +1,21 @@
+{
+  "name": "@cosfounder/standup",
+  "version": "0.1.0",
+  "description": "Generate a standup update from your git commits and editor activity. One command.",
+  "type": "module",
+  "bin": {
+    "standup": "bin/standup.js"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "files": ["bin", "src", "README.md", "LICENSE"],
+  "keywords": ["standup", "git", "cli", "developer-tools", "productivity"],
+  "license": "MIT",
+  "author": "Cosfounder Labs, Inc.",
+  "repository": { "type": "git", "url": "https://github.com/fainir/standup" },
+  "homepage": "https://cosfounder.com",
+  "bugs": "https://github.com/fainir/standup/issues",
+  "engines": { "node": ">=18" }
+}
