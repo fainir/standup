@@ -1,72 +1,131 @@
 # standup
 
-Generate a standup update from your git commits and your editor activity. One command.
+[![CI](https://github.com/fainir/standup/actions/workflows/ci.yml/badge.svg)](https://github.com/fainir/standup/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Free, MIT, by [Cosfounder](https://cosfounder.com).
+A one-command CLI that turns your recent git commits into a Yesterday / Today standup update, for developers who post a daily standup.
 
-## Why
+You shouldn't have to remember what you did yesterday. `git log` does. `standup` reads your own commits on every branch of one or more repos, starting from the last working day (Friday, when it is Monday), and prints two lines you can paste into Slack. If you have an Anthropic API key, Claude rewrites them into sentences and points out blockers.
 
-You shouldn't have to remember what you did yesterday. `git log` does. Your editor knows what files you touched. This tool just stitches the two together into a 3-line standup.
+## Quick start
+
+Needs Node.js 20+ and git. The package is not on npm yet, so run it straight from GitHub inside any repo:
 
 ```bash
+npx github:fainir/standup
+```
+
+Or install the `standup` command:
+
+```bash
+npm install -g github:fainir/standup
+standup
+```
+
+> If `ANTHROPIC_API_KEY` is set in your shell, your commit subjects are sent to the Claude API to be summarized. Add `--no-llm` to keep everything on your machine.
+
+## Usage
+
+All output below is real, from two demo repos on a Tuesday. They contain a commit on an unmerged `invoice-export` branch (included), plus a teammate's commit and a merge commit (both left out).
+
+```console
+$ cd ~/code/api
 $ standup
-Yesterday: shipped invoice-update agent (#142), pair-debugged Stripe webhook retry, reviewed Maya's onboarding copy
-Today: investor-update voice corpus pass, prep for 1:1s
-Blocked: waiting on Mercury API access for the cap-table sync
+Yesterday: api: Add CSV export for invoices; api: Add retry with backoff to Stripe webhook handler; api: Fix N+1 query in GET /invoices
+Today: api: Bump Node to 22 in Dockerfile
 ```
 
-Paste into Slack. Move on.
+Pick your own window with any date git understands:
 
-## Install
-
-```bash
-npm install -g @cosfounder/standup
+```console
+$ standup --since "last friday midnight"
+Yesterday: api: Add CSV export for invoices; api: Add retry with backoff to Stripe webhook handler; api: Fix N+1 query in GET /invoices; api: Write migration for invoice status enum
+Today: api: Bump Node to 22 in Dockerfile
 ```
 
-Or run without install:
+Get JSON for scripts (trimmed to the first commit here):
 
-```bash
-npx @cosfounder/standup
-```
-
-## Use
-
-In any git repo:
-
-```bash
-standup                          # yesterday + today + blocked
-standup --since "3 days ago"     # custom window
-standup --json                   # structured output for piping
-standup --copy                   # copy to clipboard (macOS)
-```
-
-## How it works
-
-1. Pulls your commits across configured repos in the window
-2. Pulls editor activity (VS Code recents, file modification times)
-3. Asks an LLM (configurable: Claude, GPT, local Ollama) to summarize
-4. Outputs the 3-line standup
-
-If no LLM is configured, prints the raw commit/activity list. You write the summary.
-
-## Config
-
-`~/.standup/config.json`:
-
-```json
+```console
+$ standup --json
 {
-  "repos": ["~/code/cosfounder", "~/code/recall"],
-  "llm": { "provider": "anthropic", "model": "claude-haiku-4-7" },
-  "format": "yesterday-today-blocked",
-  "include_editor_activity": true
+  "yesterday": "api: Add CSV export for invoices; api: Add retry with backoff to Stripe webhook handler; api: Fix N+1 query in GET /invoices",
+  "today": "api: Bump Node to 22 in Dockerfile",
+  "blocked": null,
+  "raw": [
+    {
+      "hash": "0c6f4193941bbafcada19fc6b5e0111509e7e1db",
+      "ts": 1793111100000,
+      "iso": "2026-10-27T16:25:00+02:00",
+      "subject": "Bump Node to 22 in Dockerfile",
+      "repo": "api"
+    },
+    ...
+  ]
 }
 ```
 
-API key: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in env.
+Several repos at once, from any directory (see [Configuration](#configuration)):
 
-## Privacy
+```console
+$ cat ~/.standup/config.json
+{
+  "repos": ["~/code/api", "~/code/web"]
+}
+$ standup
+Yesterday: api: Add CSV export for invoices; api: Add retry with backoff to Stripe webhook handler; web: Redesign onboarding checklist; api: Fix N+1 query in GET /invoices
+Today: api: Bump Node to 22 in Dockerfile; web: Fix flaky login e2e test
+```
 
-Nothing leaves your machine unless you configure an LLM provider, in which case only the summarized commit messages are sent (not file contents). Local-only mode (`--no-llm`) is fully offline.
+Outside a repo it tells you, and exits with status 1:
+
+```console
+$ cd /tmp && standup
+standup failed: /private/tmp: not a git repository (or any of the parent directories): .git
+```
+
+Each line lists up to five commits, newest first, then `+N more`. With no commits today, the local summary says `Today: continue yesterday's work`.
+
+### Options
+
+| Option | What it does |
+| --- | --- |
+| `--since <when>` | Start of the window. Any git date: `"3 days ago"`, `"last friday midnight"`, `"2026-10-01 00:00"`. Default: midnight at the start of the last working day. |
+| `--json` | Print JSON (`yesterday`, `today`, `blocked`, `raw` commits) instead of text. |
+| `--copy` | Also copy the output to the clipboard. macOS only (uses `pbcopy`). |
+| `--no-llm` | Don't call Claude, even if `ANTHROPIC_API_KEY` is set. |
+| `-h`, `--help` | Show help. |
+
+## Configuration
+
+Optional file: `~/.standup/config.json`.
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `repos` | array of paths | the current directory | Repos to read. `~` is expanded. Repos that can't be read are skipped with a warning on stderr; if none can be read, `standup` exits with an error. |
+
+Environment variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | When set (and `--no-llm` is not passed), the commits are summarized by Claude (`claude-haiku-5-5`) and a `Blocked:` line is printed if Claude spots a blocker. |
+| `ANTHROPIC_BASE_URL` | Optional. Send Claude API requests to another endpoint, such as a proxy. |
+
+## How it works
+
+1. For each repo, reads your `git config user.email`, so an email set only in one repo is respected.
+2. Runs `git log --branches --remotes --no-merges --since=<window>`, keeping commits whose author email is exactly yours (case-insensitive).
+3. Keeps the newest 50 commits and splits them at local midnight: earlier ones go under Yesterday, the rest under Today.
+4. If `ANTHROPIC_API_KEY` is set, sends the list (time, repo folder name, subject) to Claude and asks for `{ yesterday, today, blocked }` as JSON. If the call fails or the reply is unusable, it prints the local summary and a warning instead.
+
+Nothing leaves your machine in local mode. With Claude, only commit times, repo folder names and subjects are sent: no diffs or file contents.
+
+## Limitations and FAQ
+
+- **My commits are missing.** Commits are matched by author email. Ones made with a different address (another machine, GitHub's web editor with a noreply email) won't show. Check with `git log --format='%ae' | sort -u`. Remote branches count only after a `git fetch`.
+- **`--since "last friday"` misses Friday morning.** Git fills in a missing time with the current time of day. Add `midnight` or `00:00`.
+- **It only knows commit subjects.** No editor activity, pull requests or issue trackers yet.
+- **Claude is the only LLM.** It is used automatically when `ANTHROPIC_API_KEY` is set; there is no OpenAI or local model option.
+- **`--copy` is macOS only.** On Linux, pipe into `xclip` or `wl-copy` instead.
 
 ## Roadmap
 
@@ -74,11 +133,19 @@ Nothing leaves your machine unless you configure an LLM provider, in which case 
 - Linear / GitHub PR linking
 - Multi-day standup roll-ups (weekly summary)
 - Team mode: roll up a team's individual standups into a manager view
+- Editor activity and other LLM providers (OpenAI, local Ollama)
 
-## Why we're shipping a free tool
+## Development
 
-Two reasons. One, every developer should have this; it's a 4-hour build that saves everyone 5 minutes a day. Two, if you like this, you might like [Cosfounder](https://cosfounder.com) - the AI Chief of Staff for founders that does the same thing for your whole operating loop.
+```bash
+git clone https://github.com/fainir/standup
+cd standup
+npm install
+npm test
+```
+
+The tests build throwaway git repos with backdated commits, use their own `HOME` and git config, and talk to a fake Claude API on localhost, so they need no network and no API key.
 
 ## License
 
-MIT. See LICENSE.
+MIT. See [LICENSE](LICENSE).
