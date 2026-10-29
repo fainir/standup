@@ -9,16 +9,16 @@ You shouldn't have to remember what you did yesterday. `git log` does. `standup`
 
 ## Quick start
 
-Needs Node.js 20+ and git. The package is not on npm yet, so run it straight from GitHub inside any repo:
+Needs Node.js 20+ and git. Run it inside any repo:
 
 ```bash
-npx github:fainir/standup
+npx @fainir/standup
 ```
 
 Or install the `standup` command:
 
 ```bash
-npm install -g github:fainir/standup
+npm install -g @fainir/standup
 standup
 ```
 

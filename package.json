@@ -1,5 +1,5 @@
 {
-  "name": "@cosfounder/standup",
+  "name": "@fainir/standup",
   "version": "0.1.0",
   "description": "Generate a standup update from your git commits. One command.",
   "type": "module",
@@ -20,5 +20,6 @@
   "repository": { "type": "git", "url": "git+https://github.com/fainir/standup.git" },
   "homepage": "https://github.com/fainir/standup#readme",
   "bugs": { "url": "https://github.com/fainir/standup/issues" },
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=20" },
+  "publishConfig": { "access": "public" }
 }
